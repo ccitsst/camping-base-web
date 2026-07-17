@@ -16,19 +16,14 @@ export async function fetchModels(
     httpOptions: cleanBaseUrl ? { baseUrl: cleanBaseUrl } : undefined,
   });
 
-  // Call models list API
+  // Call models list API — returns a Pager, which only supports async
+  // iteration (for await...of); it has no .models property, and iterating
+  // it this way also auto-fetches subsequent pages via nextPageToken.
   const response = await ai.models.list();
-  
-  // The response is an iterable of models
+
   const modelsList: any[] = [];
-  if (response && typeof (response as any)[Symbol.iterator] === 'function') {
-    for (const model of response as any) {
-      modelsList.push(model);
-    }
-  } else if (response && Array.isArray(response)) {
-    modelsList.push(...response);
-  } else if (response && (response as any).models) {
-    modelsList.push(...((response as any).models));
+  for await (const model of response as any) {
+    modelsList.push(model);
   }
 
   if (modelsList.length === 0) {
