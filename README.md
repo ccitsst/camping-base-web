@@ -4,9 +4,9 @@
 ## 下載範例檔案
 
 * [示範網站](https://gears.tw)
+* [露營裝備租賃價目表 (PDF)](./docs/露營裝備租賃價目表.pdf)
 * [露營出租商品表 (CSV)](./docs/露營出租商品表.csv)
 * [露營出租商品表 (Markdown)](./docs/露營出租商品表.md)
-* [露營裝備租賃價目表 (PDF)](./docs/露營裝備租賃價目表.pdf)
 * [服務條款](./docs/service_policy.md)
 
 ## 提示詞範例
