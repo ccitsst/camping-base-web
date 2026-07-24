@@ -6,6 +6,7 @@
 * [示範網站](https://gears.tw)
 * [露營裝備租賃價目表 (PDF)](./docs/露營裝備租賃價目表.pdf)
 * [露營出租商品表 (CSV)](./docs/露營出租商品表.csv)
+* [露營出租商品表 (Google Sheet)](https://docs.google.com/spreadsheets/d/e/2PACX-1vRshojqbRnT4QAMdMg-JlyaG969mUcNtP9Q_iV2nXETyIca8Sek0UhfunjM_BSR9Q/pub?output=csv)
 * [露營出租商品表 (Markdown)](./docs/露營出租商品表.md)
 * [服務條款](./docs/service_policy.md)
 
@@ -67,4 +68,29 @@ npm run build
 
 ```bash
 npm run preview
+```
+
+
+## 課堂上可能用到的提示詞整理
+
+### PDF 轉 Markdown
+
+```text
+幫我將商品以 markdown 格式整理成清單，存到 ./data/products.md，參考下列格式:
+
+# 藍山PRO2 輕量雙人帳
+- 編號: #UT001
+- 規格: 帳篷 / 非自立帳(需2支登山杖) / 雙人帳
+- 品牌: 三峰出
+- 租金: 490 + 100 / 日
+- 押金: 1,000
+```
+
+
+### 採用 CSV
+
+```text
+分析底下 CSV 文件格式，作為資料結構定義參考，然後在 Agent 設定增加一個資料來源設定，方便我填入 Google Sheet CSV 來作為即時商品資料參考。
+
+Google Sheet 連結：[貼上連結]
 ```
