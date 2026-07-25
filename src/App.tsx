@@ -3,7 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { InputArea } from './components/InputArea';
 import type { Message, Attachment } from './types';
-import { streamGeminiChat } from './services/GeminiService';
+import { streamGeminiChat, formatErrorMessage } from './services/GeminiService';
 import { Menu, Sparkles } from 'lucide-react';
 
 const DEFAULT_SYSTEM_PROMPT = 
@@ -137,14 +137,14 @@ export default function App() {
       );
     } catch (error: any) {
       console.error('Gemini streaming error:', error);
-      const errorMessage = error?.message || '發生未知錯誤，請確認 API Key、代理設定與網路連線狀態。';
+      const formattedError = await formatErrorMessage(error);
       
       setMessages(prev => 
         prev.map(msg => 
           msg.id === assistantMsgId 
             ? { 
                 ...msg, 
-                content: `⚠️ **發送失敗**\n\n${errorMessage}\n\n*提示：請檢查 API Key 是否正確，以及是否能順利連接至伺服器。*` 
+                content: formattedError 
               } 
             : msg
         )

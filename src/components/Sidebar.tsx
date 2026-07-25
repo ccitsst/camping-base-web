@@ -116,10 +116,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* API Key */}
             <div className="input-group">
-              <label className="input-label">
-                <Key style={{ width: '14px', height: '14px' }} />
-                Gemini API Key
-              </label>
+              <div className="input-label-row">
+                <label className="input-label">
+                  <Key style={{ width: '14px', height: '14px' }} />
+                  Gemini API Key
+                </label>
+                <a 
+                  href="https://aistudio.google.com/app/api-keys" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="label-link"
+                >
+                  取得金鑰
+                </a>
+              </div>
               <div className="input-password-wrapper">
                 <input
                   type={showApiKey ? 'text' : 'password'}
