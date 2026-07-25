@@ -170,6 +170,7 @@ export async function streamGeminiChat(
     contents: cleanContents,
     config: {
       systemInstruction: systemPrompt.trim() ? systemPrompt : undefined,
+      tools: [{ googleSearch: {} }],
     }
   });
 
