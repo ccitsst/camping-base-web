@@ -94,3 +94,24 @@ npm run preview
 
 Google Sheet 連結：[貼上連結]
 ```
+
+### 將政策文件做成 Embedding 向量
+
+```text
+/grill-me 將 ./docs/service_policy.md 政策文件轉成 rAG 向量資料庫。
+1. 準備轉換 script 讓我預先處理資料轉換。
+    * 使用 gemini-embedding-2 模型
+    * 並存到 ./src/data/service_policy.embedding 向量
+2. 增加 npm script policy:convert，負責執行轉換script。
+3. 準備 .env 檔案，存放轉換期間的 API_KEY。
+4. 將 .env 加入 .gitignore
+5. 為 Agent 增加查詢政策所需的 Tool Functions
+6. 技術細節由你決定，有設計功能或商業決策問題再問我。
+```
+
+## 課堂提及的參考資源
+
+* [Gemini 開發 必裝技能](https://github.com/drgarbage/ag-course-index/blob/main/docs/guides/gemini-api-skill-and-mcp.md)
+* [Skill 商城](https://skillsmp.com/)
+    * [pdf-to-markdown](https://skillsmp.com/creators/azure-samples/python-agentframework-demos/github-skills-pdf-to-markdown) : 將 PDF 轉換成 Markdown 檔案的 skill。
+    * [frontend-design](https://skillsmp.com/creators/anthropics/skills/skills-frontend-design) : 提供前端 UI 設計建議。
