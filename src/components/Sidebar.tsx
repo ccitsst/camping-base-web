@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Settings, Key, Bot, MessageSquare, Trash2, RefreshCw, Eye, EyeOff, X, Sparkles, Globe 
+  Settings, Key, Bot, MessageSquare, Trash2, RefreshCw, Eye, EyeOff, X, Sparkles, Globe, Database, Link 
 } from 'lucide-react';
 import { fetchModels } from '../services/GeminiService';
+import { fetchAndParseProducts } from '../services/ProductService';
+import type { Product } from '../types';
 
 interface SidebarProps {
   apiKey: string;
@@ -18,6 +20,12 @@ interface SidebarProps {
   onClearHistory: () => void;
   isOpen: boolean;
   onClose: () => void;
+  csvUrl: string;
+  setCsvUrl: (url: string) => void;
+  products: Product[];
+  setProducts: (products: Product[]) => void;
+  lastSyncTime: string;
+  setLastSyncTime: (time: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -34,11 +42,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClearHistory,
   isOpen,
   onClose,
+  csvUrl,
+  setCsvUrl,
+  products,
+  setProducts,
+  lastSyncTime,
+  setLastSyncTime,
 }) => {
   const [models, setModels] = useState<{ name: string; displayName: string }[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+
+  const handleSyncProducts = async () => {
+    if (!csvUrl.trim()) {
+      setSyncError('請輸入商品資料 CSV 網址。');
+      return;
+    }
+    
+    setIsSyncing(true);
+    setSyncError('');
+    try {
+      const syncedProducts = await fetchAndParseProducts(csvUrl.trim());
+      if (syncedProducts.length === 0) {
+        throw new Error('未從 CSV 中解析出任何有效的商品。');
+      }
+      setProducts(syncedProducts);
+      const now = new Date().toLocaleString('zh-TW', { hour12: false });
+      setLastSyncTime(now);
+      alert(`同步成功！已載入 ${syncedProducts.length} 筆商品。`);
+    } catch (err: any) {
+      console.error(err);
+      setSyncError(err.message || '商品同步失敗，請確認網址是否正確且公開。');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Auto-fetch models when API Key, Base URL or proxy switch changes
   useEffect(() => {
@@ -233,6 +274,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 rows={6}
               />
             </div>
+          </div>
+
+          <hr style={{ border: 'none', borderBottom: '1px solid var(--glass-border)' }} />
+
+          {/* Product Sync Section */}
+          <div className="settings-section">
+            <div className="section-title">
+              <Database style={{ width: '16px', height: '16px', color: 'var(--accent-primary)' }} />
+              商品資料同步
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">
+                <Link style={{ width: '14px', height: '14px' }} />
+                CSV 資料來源網址
+              </label>
+              <input
+                type="text"
+                value={csvUrl}
+                onChange={(e) => setCsvUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+              />
+            </div>
+
+            <button
+              onClick={handleSyncProducts}
+              className="btn-sync-products"
+              disabled={isSyncing}
+            >
+              <RefreshCw 
+                style={{ width: '16px', height: '16px' }} 
+                className={isSyncing ? 'animate-spin' : ''} 
+              />
+              {isSyncing ? '同步中...' : '同步商品資料'}
+            </button>
+            
+            {syncError && (
+              <p className="input-hint" style={{ color: '#ff4a4a', marginTop: '-10px' }}>{syncError}</p>
+            )}
+
+            {products.length > 0 && (
+              <p className="sync-status-text">
+                🟢 已同步 {products.length} 筆商品
+                {lastSyncTime && <span className="sync-time"><br/>(更新時間: {lastSyncTime})</span>}
+              </p>
+            )}
           </div>
           
           <hr style={{ border: 'none', borderBottom: '1px solid var(--glass-border)' }} />

@@ -2,17 +2,52 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { InputArea } from './components/InputArea';
-import type { Message, Attachment } from './types';
+import type { Message, Attachment, Product } from './types';
 import { streamGeminiChat, formatErrorMessage } from './services/GeminiService';
+import { fetchAndParseProducts } from './services/ProductService';
 import { Menu, Sparkles } from 'lucide-react';
 
 const DEFAULT_SYSTEM_PROMPT = 
-  '你是一位溫慢親切、專業有禮的 AI 智慧語音助理。請預設使用繁體中文（zh-TW）與 Markdown 格式回答使用者的問題。對於程式碼，請標記正確語言並提供高亮區塊；對於數學公式或表格，請提供完美的 Markdown 排版，讓畫面看起來輕鬆舒適且易於閱讀。';
+  `你是一家專業露營裝備租賃服務「gears.tw」（官網：http://gears.tw）的貼心客服小編 Agent。
+
+你的主要職責是：
+1. **你只能回答與露營租賃業務相關的問題。** 若使用者提出任何非露營裝備、非租賃相關的無關問題（例如：寫程式、問美食、問其他旅遊地點、天氣等），請一定要禮貌且委婉地拒絕回答，並引導使用者回到露營裝備租賃的服務主題上。
+2. 協助顧客查詢與推薦適合的露營裝備（如帳篷、背包、睡袋等）。
+3. 提供精確的商品規格、租金與押金資訊。**你必須使用 queryProducts 工具來查詢真實的商品規格與狀態，絕對不能憑空編造商品或價格。**
+4. 如果顧客詢問的商品狀態（status）不是「已上架」（例如「送洗」、「破損」、「下架」、「未到貨」），請委婉告知該商品目前無法租借。
+5. 當顧客表達租借意願或想要預約時，請引導他們至我們的 Line 官方帳號（ID: @gears.tw）進行預約，並主動提供一個方便複製的 Markdown 格式預約清單。
+
+預約清單格式範本（請以 Code Block 區塊呈現以便複製）：
+\`\`\`markdown
+### gears.tw 露營裝備預約申請
+- 租借人姓名：[請填寫姓名]
+- 聯絡電話：[請填寫電話]
+- 租借日期與天數：[例如：2026/08/01 ~ 2026/08/02 (兩天一夜)]
+- 租借裝備清單：
+  1. [商品編號] [品牌] [品名] x [數量]
+- 預估總租金：NT$ [試算金額]
+- 預估總押金：NT$ [試算金額]
+\`\`\`
+
+對答風格請保持溫暖親切、專業有禮，回覆預設使用繁體中文（zh-TW）與精美的 Markdown 格式排版。`;
 
 export default function App() {
   // --- Settings & Chat History States ---
   const [apiKey, setApiKey] = useState<string>(() => {
     return localStorage.getItem('web_ai_agent_api_key') || '';
+  });
+
+  const [csvUrl, setCsvUrl] = useState<string>(() => {
+    return localStorage.getItem('web_ai_agent_csv_url') || '';
+  });
+
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('web_ai_agent_products');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    return localStorage.getItem('web_ai_agent_last_sync_time') || '';
   });
 
   const [useProxy, setUseProxy] = useState<boolean>(() => {
@@ -66,6 +101,37 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('web_ai_agent_chat_messages', JSON.stringify(messages));
   }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem('web_ai_agent_csv_url', csvUrl);
+  }, [csvUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('web_ai_agent_products', JSON.stringify(products));
+  }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem('web_ai_agent_last_sync_time', lastSyncTime);
+  }, [lastSyncTime]);
+
+  // --- Background Auto Sync on Mount ---
+  useEffect(() => {
+    if (csvUrl.trim()) {
+      fetchAndParseProducts(csvUrl.trim())
+        .then(syncedProducts => {
+          if (syncedProducts.length > 0) {
+            setProducts(syncedProducts);
+            const now = new Date().toLocaleString('zh-TW', { hour12: false });
+            setLastSyncTime(now);
+            console.log(`[Auto Sync] Successfully background-synced ${syncedProducts.length} products`);
+          }
+        })
+        .catch(err => {
+          console.warn('[Auto Sync] Failed to sync products in background:', err);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Operations ---
   const handleClearHistory = () => {
@@ -124,6 +190,7 @@ export default function App() {
         messages.concat(userMessage),
         text,
         currentAttachments,
+        products,
         (chunk) => {
           accumulatedResponse += chunk;
           setMessages(prev => 
@@ -172,6 +239,12 @@ export default function App() {
         onClearHistory={handleClearHistory}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        csvUrl={csvUrl}
+        setCsvUrl={setCsvUrl}
+        products={products}
+        setProducts={setProducts}
+        lastSyncTime={lastSyncTime}
+        setLastSyncTime={setLastSyncTime}
       />
 
       {/* Main Chat Layout Area */}

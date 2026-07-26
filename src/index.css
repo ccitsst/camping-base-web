@@ -281,6 +281,49 @@ textarea {
   border-color: var(--accent-primary);
 }
 
+.btn-sync-products {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  color: var(--text-inverse);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: var(--transition-smooth);
+  width: 100%;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(191, 159, 98, 0.2);
+}
+
+.btn-sync-products:hover {
+  background: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+  box-shadow: 0 6px 16px rgba(191, 159, 98, 0.3);
+}
+
+.btn-sync-products:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sync-status-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: -12px;
+}
+
+.sync-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+
 /* ================= MAIN CONTAINER ================= */
 
 .main-layout {

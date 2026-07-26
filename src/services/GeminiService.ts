@@ -1,5 +1,48 @@
-import { GoogleGenAI } from '@google/genai';
-import type { Message, Attachment } from '../types';
+import { GoogleGenAI, Type } from '@google/genai';
+import type { Message, Attachment, Product } from '../types';
+
+/**
+ * Local helper to filter products based on category and keyword criteria.
+ */
+function queryProductsLocal(
+  products: Product[],
+  category?: string,
+  keyword?: string
+): any[] {
+  let filtered = products;
+
+  if (category) {
+    const cleanCategory = category.trim().toLowerCase();
+    filtered = filtered.filter(p => 
+      p.category.toLowerCase().includes(cleanCategory)
+    );
+  }
+
+  if (keyword) {
+    const cleanKeyword = keyword.trim().toLowerCase();
+    filtered = filtered.filter(p => 
+      p.brand.toLowerCase().includes(cleanKeyword) ||
+      p.name.toLowerCase().includes(cleanKeyword) ||
+      p.id.toLowerCase().includes(cleanKeyword)
+    );
+  }
+
+  // Format the response structure nicely for the model
+  return filtered.map(p => ({
+    category: p.category,
+    id: p.id,
+    brand: p.brand,
+    name: p.name,
+    weight: p.weight,
+    rent1: p.rent1,
+    rent2: p.rent2,
+    deposit: p.deposit,
+    status: p.status,
+    rentStatus: p.rentStatus,
+    reservation: p.reservation,
+    details: p.details
+  }));
+}
 
 /**
  * Fetch the list of available Gemini models using the new GoogleGenAI SDK.
@@ -77,6 +120,7 @@ export async function streamGeminiChat(
   history: Message[],
   currentMessageText: string,
   currentAttachments: Attachment[],
+  products: Product[],
   onChunk: (text: string) => void
 ): Promise<string> {
   const cleanBaseUrl = baseUrl.trim() ? baseUrl.trim() : undefined;
@@ -87,10 +131,11 @@ export async function streamGeminiChat(
     httpOptions: cleanBaseUrl ? { baseUrl: cleanBaseUrl } : undefined,
   });
 
-  // Construct contents array. It must alternate between 'user' and 'model'.
-  const contents: any[] = [];
-
-  // Filter and format history
+  // Construct contents array.
+  // First, format and clean the alternating user/model history
+  const historyContents: any[] = [];
+  let expectedRole = 'user';
+  
   const filteredHistory = history.filter(msg => msg.role === 'user' || msg.role === 'model');
   
   filteredHistory.forEach((msg) => {
@@ -111,10 +156,13 @@ export async function streamGeminiChat(
     }
 
     if (parts.length > 0) {
-      contents.push({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts,
-      });
+      const role = msg.role === 'user' ? 'user' : 'model';
+      if (role === expectedRole) {
+        historyContents.push({ role, parts });
+        expectedRole = expectedRole === 'user' ? 'model' : 'user';
+      } else if (historyContents.length > 0 && historyContents[historyContents.length - 1].role === role) {
+        historyContents[historyContents.length - 1].parts.push(...parts);
+      }
     }
   });
 
@@ -132,62 +180,123 @@ export async function streamGeminiChat(
     throw new Error('Cannot send an empty message without attachments');
   }
 
-  contents.push({
-    role: 'user',
-    parts: currentParts,
-  });
-
-  // Clean the payload to ensure strictly alternating user/model roles.
-  const cleanContents: any[] = [];
-  let expectedRole = 'user';
-  
-  for (const item of contents) {
-    if (item.role === expectedRole) {
-      cleanContents.push(item);
-      expectedRole = expectedRole === 'user' ? 'model' : 'user';
-    } else {
-      if (cleanContents.length > 0 && cleanContents[cleanContents.length - 1].role === item.role) {
-        cleanContents[cleanContents.length - 1].parts.push(...item.parts);
-      } else {
-        console.warn(`Skipping out-of-order role in Gemini API payload: expected ${expectedRole}, got ${item.role}`);
-      }
-    }
-  }
-
-  if (cleanContents.length === 0) {
-    cleanContents.push({
+  const activeContents = [...historyContents];
+  if (activeContents.length > 0 && activeContents[activeContents.length - 1].role === 'user') {
+    activeContents[activeContents.length - 1].parts.push(...currentParts);
+  } else {
+    activeContents.push({
       role: 'user',
-      parts: currentParts
+      parts: currentParts,
     });
   }
 
   // Clean name (e.g. models/gemini-2.5-flash -> gemini-2.5-flash)
   const cleanModelName = modelName.startsWith('models/') ? modelName.substring(7) : modelName;
 
-  // Execute the stream using models.generateContentStream
-  const responseStream = await ai.models.generateContentStream({
-    model: cleanModelName,
-    contents: cleanContents,
-    config: {
-      systemInstruction: systemPrompt.trim() ? systemPrompt : undefined,
-      tools: [{ googleSearch: {} }],
+  let finalResponseText = '';
+  let continueCalling = true;
+
+  while (continueCalling) {
+    continueCalling = false; // Stop unless we get a functionCall
+
+    const responseStream = await ai.models.generateContentStream({
+      model: cleanModelName,
+      contents: activeContents,
+      config: {
+        systemInstruction: systemPrompt.trim() ? systemPrompt : undefined,
+        tools: [
+          {
+            functionDeclarations: [
+              {
+                name: 'queryProducts',
+                description: '查詢露營裝備租賃商品的詳細規格、租金、押金與目前狀態（已上架、送洗、破損等）。',
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    category: { 
+                      type: Type.STRING, 
+                      description: '商品類別，如：輕量化帳篷、輕量化背包、輕量化睡袋、其他裝備 (選填)' 
+                    },
+                    keyword: { 
+                      type: Type.STRING, 
+                      description: '品名或品牌的關鍵字 (選填)' 
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+      }
+    });
+
+    let functionCallsToExecute: any[] = [];
+
+    for await (const chunk of responseStream) {
+      if ((chunk as any).functionCalls && (chunk as any).functionCalls.length > 0) {
+        functionCallsToExecute.push(...(chunk as any).functionCalls);
+      }
+
+      // Safely extract text from chunk
+      const chunkText = typeof (chunk as any).text === 'function' 
+        ? (chunk as any).text() 
+        : (chunk as any).text;
+
+      if (chunkText) {
+        finalResponseText += chunkText;
+        onChunk(chunkText);
+      }
     }
-  });
 
-  let fullResponseText = '';
-  for await (const chunk of responseStream) {
-    // Safely extract text from chunk
-    const chunkText = typeof (chunk as any).text === 'function' 
-      ? (chunk as any).text() 
-      : (chunk as any).text;
+    if (functionCallsToExecute.length > 0) {
+      // 1. Add model's tool request to history
+      activeContents.push({
+        role: 'model',
+        parts: functionCallsToExecute.map(fc => ({
+          functionCall: {
+            name: fc.name,
+            args: fc.args,
+            id: fc.id
+          }
+        }))
+      });
 
-    if (chunkText) {
-      fullResponseText += chunkText;
-      onChunk(chunkText);
+      // 2. Execute local query logic
+      const toolParts: any[] = [];
+      for (const fc of functionCallsToExecute) {
+        if (fc.name === 'queryProducts') {
+          const category = fc.args?.category;
+          const keyword = fc.args?.keyword;
+          const queryResult = queryProductsLocal(products, category, keyword);
+          
+          toolParts.push({
+            functionResponse: {
+              name: fc.name,
+              response: { result: queryResult }
+            }
+          });
+        } else {
+          toolParts.push({
+            functionResponse: {
+              name: fc.name,
+              response: { error: `Unsupported function name: ${fc.name}` }
+            }
+          });
+        }
+      }
+
+      // 3. Add tool responses to history
+      activeContents.push({
+        role: 'tool',
+        parts: toolParts
+      });
+
+      // 4. Continue calling Gemini API with updated history
+      continueCalling = true;
     }
   }
 
-  return fullResponseText;
+  return finalResponseText;
 }
 
 /**

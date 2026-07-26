@@ -19,3 +19,19 @@ export interface Settings {
   selectedModel: string;
   baseUrl: string;
 }
+
+export interface Product {
+  category: string;     // 商品類別
+  id: string;           // 商品編號
+  brand: string;        // 品牌
+  name: string;         // 品名
+  weight: string;       // 重量
+  rent1: string;        // 兩天一夜租金
+  rent2: string;        // 續租日租金
+  deposit: string;      // 押金
+  status: string;       // 上架狀態
+  rentStatus: string;   // 出租中 / 歸還日
+  reservation: string;  // 預約
+  details: { [key: string]: string }; // 其他特規 (如帳篷容量、背包背長、睡袋極限溫度等)
+}
+
